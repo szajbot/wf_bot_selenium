@@ -1,0 +1,9 @@
+#STARTING PROGRAM PARAM
+True
+True
+True
+True
+True
+True
+#default crop
+kukurydza
