@@ -6,4 +6,4 @@ True
 True
 True
 #default crop
-kukurydza
+marchewki
