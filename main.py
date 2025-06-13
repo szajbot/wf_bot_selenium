@@ -1,8 +1,10 @@
 import datetime
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
+
 import schedule
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 import pyautogui
 from datetime import datetime
 import time
@@ -55,29 +57,30 @@ def showMainMenu():
 def schedulePlanting():
     pass
 
-def findAndClickAndWrite(window, id, write):
+def findAndClick(driver, id):
     try:
-        find = window.find_element(by=By.ID, value=id)
-        find.click()
+        element = driver.find_element(by=By.ID, value=id)
+        element.click()
+    except:
+        print(f"Cannot find element: {id}")
+
+def findAndWrite(driver, id, write):
+    try:
+        element = driver.find_element(by=By.ID, value=id)
+        element.click()
         time.sleep(0.5)
         pyautogui.write(str(write))
         time.sleep(0.5)
     except:
-        print("some error at: " + id)
+        print("Cannot find element: {id}" + id)
 
-def findAndClickAndCheck(window, id):
+def findAndClickAndCheck(driver, id):
     try:
-        find = window.find_element(by=By.ID, value=id)
-        find.click()
+        element = driver.find_element(by=By.ID, value=id)
+        element.click()
+        return True
     except:
         return False
-
-def findAndClick(window, id):
-    try:
-        find = window.find_element(by=By.ID, value=id)
-        find.click()
-    except:
-        None
 
 def harvest(window):
     time.sleep(1)
@@ -86,22 +89,36 @@ def harvest(window):
     findAndClick(window, "globalbox_button1")
     time.sleep(1)
 
+
+def findAndSelect(driver, id, value):
+    try:
+        element = driver.find_element(by=By.ID, value=id)
+        element.click()
+        select = Select(element)
+        select.select_by_value(value)
+    except:
+        print(f"Cannot find element: {id}")
+
+
 def login():
     try:
-        service = Service(executable_path="chromedriver.exe")
-        window = webdriver.Chrome(service=service)
-        window.get("https://www.wolnifarmerzy.pl")
+        driver = webdriver.Chrome()
+        driver.get("https://www.wolnifarmerzy.pl")
         time.sleep(4)
-        findAndClickAndWrite(window, "loginusername", PASSWORD)
-        findAndClickAndWrite(window, "loginpassword", LOGIN)
-        time.sleep(4)
-        for i in range(3):
-            findAndClickAndWrite(window, "newsbox_close")
-        checkIsCorrect = findAndClickAndCheck(window, "rackcat1_img")
-        time.sleep(0.2)
+        findAndSelect(driver, 'loginserver', '20')
+        findAndWrite(driver, "loginusername", LOGIN)
+        findAndWrite(driver, "loginpassword", PASSWORD)
+        findAndClick(driver, "loginbutton")
+        time.sleep(3)
+        for i in range(5):
+            findAndClick(driver, "newsbox_close")
+        close_button = driver.find_element(By.CSS_SELECTOR, "div.mini_close.link[onclick='bonuspack.close();']")
+        close_button.click()
+        checkIsCorrect = findAndClickAndCheck(driver, "rackcat1_img")
+        time.sleep(1)
     except:
-        checkIsCorrect = False
-    return window, checkIsCorrect
+        print("Error occured when logging in")
+    return driver, checkIsCorrect
 
 def plant(vegetable: Plantable, window):
     findAndClick(window, vegetable.id)
@@ -143,13 +160,18 @@ def water(vegetable: Plantable, window):
     time.sleep(1)
 
 def planting(farmPosition, vegetable: Plantable, watering):
-    window, checkIsCorrect = login()
-    findAndClick(window, farmOnePosition)
-    harvest(window)
-    plant(vegetable, window)
-    water(vegetable, window)
-    findAndClick(window, exitFromFarmButton)
-    time.sleep(2)
+    driver, checkIsCorrect = login()
+    findAndClick(driver, farmOnePosition)
+    harvest(driver)
+    plant(vegetable, driver)
+    water(vegetable, driver)
+    findAndClick(driver, exitFromFarmButton)
+    findAndClick(driver, farmTwoPosition)
+    harvest(driver)
+    plant(vegetable, driver)
+    water(vegetable, driver)
+    findAndClick(driver, exitFromFarmButton)
+    # time.sleep(2)
     pass
 
 
@@ -157,12 +179,14 @@ def showVegetables():
     i = 0
     for i in range(len(plantables)):
         print(f'Opcja nr {i + 1}, {plantables[i].name}: rozmiar: {plantables[i].size} czas do zbioru: {plantables[i].plantTime}')
-    user_input = int(input())
+    user_input = int(input()) - 1
     planting(farmOnePosition, plantables[user_input], 'true')
 
 
 def manualPlanting():
     print("What would you like to plant?")
+    for x in range(1, 108):
+        pole.append("field" + str(x))
     showVegetables()
 
 
