@@ -1,5 +1,5 @@
 /pass-delete.txt
-/settings/params.py
+/settings/constants.py
 /test.py
 __pycache__
 .idea/*
