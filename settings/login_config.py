@@ -1,0 +1,3 @@
+PASSWORD = ""
+LOGIN = ""
+SERVER = 20
