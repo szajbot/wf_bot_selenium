@@ -3,26 +3,16 @@ import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 
-import schedule
+from datetime import datetime
 from selenium import webdriver
 import pyautogui
-import configparser
 import json
-from datetime import datetime
 import time
 
-from settings.params import (
+from settings.login_config import (
     PASSWORD,
     LOGIN,
     SERVER
-)
-
-from settings.settings import (
-    FARM_COUNTER,
-    FARM_ONE_WATERING_BONUS,
-    FARM_ONE_POSITION,
-    FARM_TWO_WATERING_BONUS,
-    FARM_TWO_POSITION,
 )
 
 
@@ -34,12 +24,29 @@ class Plantable:
         self.plantTime = plantTime
 
 
+class ScheduledJob:
+    def __init__(self, executed: bool, function, plant: Plantable, endless: bool):
+        self.executed = executed
+        self.endless = endless
+        self.function = function
+        self.plant = plant
+
+
+class ScheduledJobQueue:
+    def __init__(self, jobsList: list[ScheduledJob], position):
+        self.jobsList = jobsList
+        self.position = position
+        self.lastTaskTime = datetime.now()
+
+
 # INICJALIZACJA
 window = webdriver
 user_choose = []
 user_input = ""
 plantables = []
 pole = []
+jobsQueue: list[ScheduledJobQueue] = []
+executed_plant_job: bool = False
 harvestAllButton = "cropall"
 waterOneButton = "giessen"
 exitFromFarmButton = "gardencancel"
@@ -51,8 +58,6 @@ animalFeed4 = "feed_item4_normal"
 config_file_name = 'settings/config.json'
 with open(config_file_name, 'r') as file:
     config = json.loads(file.read())
-
-
 
 # name, id, size, plant time
 plantables.append(Plantable("Marchewki", "rackitem17", 1, 15))
@@ -71,15 +76,113 @@ plantables.append(Plantable("Rzepak", "rackitem4", 4, 90))
 
 def showMainMenu():
     print("----------------WF_farm_bot----------------")
-    print("1. Start planned farming")
-    print("2. Manual plant")
+    print("1. Schedule Farming")
+    print("2. Manual Farming")
     print("3. Set up configuration")
     print("4. Exit")
 
 
-def schedulePlanting():
+def showScheduleMenu():
+    print("----------------Schedule Job----------------")
+    print("1. Add job to queue")
+    print("2. Remove job from queue")
+    print("3. Execute queue")
+    print("4. Show queue")
+    print("5. Exit")
 
-    pass
+
+def showCurrentQueue():
+    print("----------------Queue statuses----------------")
+    for queue in jobsQueue:
+        print(f'Queue: {queue.position}')
+        for job in queue.jobsList:
+            print(f'Job: {job.plant.name}')
+        print("\n")
+
+
+def showAvailablePositions():
+    for x in range(int(config["farm"]["counter"])):
+        print(f'Option {x + 1}: position: {config["farm"][intToStrNumber(x + 1)]}')
+
+
+
+def addJobToQueue():
+    showAvailablePositions()
+    user_choose = input()
+    position = config["farm"][intToStrNumber(int(user_choose))]
+    plant: Plantable = setUpVegetables()
+
+    exists = False
+
+    for queue in jobsQueue:
+        if queue.position == position:
+            queue.jobsList.append(ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False))
+            exists = True
+
+    if not exists:
+        job = ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False)
+        jobList = list()
+        jobList.append(job)
+        queue = ScheduledJobQueue(jobList, position)
+        jobsQueue.append(queue)
+
+
+def removeJobsFromQueue():
+    global jobsQueue
+    jobsQueue = list()
+
+
+def executeQueue():
+    # immediately perform tasks from first position in queue
+    for queue in jobsQueue:
+        job: ScheduledJob = queue.jobsList.pop(0)
+        job.function(job.plant, queue.position)
+
+    while True:
+        for queue in jobsQueue:
+            timePassed = queue.lastTaskTime - datetime.now()
+            if timePassed.seconds >= queue.jobsList[0].plant.plantTime * 60:
+                job: ScheduledJob = queue.jobsList.pop(0)
+                job.function(job.plant, queue.position)
+
+        time.sleep(5)
+        print("----------------Queue statuses----------------")
+        for queue in jobsQueue:
+            timePassed = queue.lastTaskTime - datetime.now()
+            timeLeft = queue.jobsList[0].plant.plantTime * 60 - timePassed.seconds
+            print(f"Queue: {queue.position} time for next task: {timeLeft} queue: {queue.jobsList}")
+
+
+def scheduleFarming():
+    while True:
+        showScheduleMenu()
+        user_choose = input()
+        if (user_choose == "1"):
+            addJobToQueue()
+        elif (user_choose == "2"):
+            removeJobsFromQueue()
+        elif (user_choose == "3"):
+            executeQueue()
+        elif (user_choose == "4"):
+            showCurrentQueue()
+        elif (user_choose == "5"):
+            exit(1)
+        else:
+            print("Zły wybór")
+
+
+def testJob():
+    print("test")
+    global executed_plant_job
+    executed_plant_job = True
+
+
+def executeSchedulePlant(plant: Plantable, position):
+    driver, checkIsCorrect = login()
+    driver.fullscreen_window()  # TODO Temp solution
+    planting(position, plant, 'true', driver)
+    driver.close()
+    # executed_plant_job = True
 
 
 def findAndClick(driver, id):
@@ -216,33 +319,76 @@ def setUpVegetables() -> Plantable:
     return plantables[user_input]
 
 
-def manualPlanting():
-    for x in range(1, 121):
-        pole.append("field" + str(x))
-    plant: Plantable = setUpVegetables()
+def execute(plant):
     driver, checkIsCorrect = login()
     driver.fullscreen_window()  # TODO Temp solution
-    planting(FARM_ONE_POSITION, plant, 'true', driver)
-    planting(FARM_TWO_POSITION, plant, 'true', driver)
+    planting(config["farm"]["one"]["position"], plant, 'true', driver)
+    planting(config["farm"]["two"]["position"], plant, 'true', driver)
+
+
+def manualPlanting():
+    plant: Plantable = setUpVegetables()
+    execute(plant)
+
+
+def intToStrNumber(user_choose):
+    switcher = {
+        1: "one",
+        2: "two",
+        3: "three",
+        4: "four",
+        5: "five",
+    }
+
+    return switcher.get(user_choose, "nothing")
 
 
 def setUpConfiguration():
     print("###################### SET UP CONFIGURATION ######################")
-    # print("Podaj liczbę ..")
-    # user_choose = input()
+    print("Podaj liczbę pól")
+    user_choose = input()
+    i = int(user_choose)
+    config["farm"]["counter"] = i
+    for x in range(i):
+        print("Podaj pozycję pola")
+        user_choose = input()
+        config["farm"][intToStrNumber(x + 1)]["position"] = f'farm1_pos{user_choose}'
+
+        print("Podaj bonus podlewania")
+        user_choose = input()
+        config["farm"][intToStrNumber(x + 1)]["watering_bonus"] = int(user_choose)
+
+    print("Podaj liczbę kurników")
+    user_choose = input()
+    i = int(user_choose)
+    config["chicken"]["counter"] = i
+    for x in range(i):
+        print("Podaj pozycję kurnika")
+        user_choose = input()
+        config["chicken"][intToStrNumber(x + 1)]["position"] = f'farm1_pos{user_choose}'
+
+    print("Podaj liczbę obór")
+    user_choose = input()
+    i = int(user_choose)
+    config["cow"]["counter"] = i
+    for x in range(i):
+        print("Podaj pozycję obory")
+        user_choose = input()
+        config["cow"][intToStrNumber(x + 1)]["position"] = f'farm1_pos{user_choose}'
+
     file_to_write = json.dumps(config, indent=4)
-    config["farm"]["counter"] = 3
     with open(config_file_name, "w") as outfile:
         outfile.write(file_to_write)
 
 
+for x in range(1, 121):
+    pole.append("field" + str(x))
 
 while True:
-    # print(config["farm"])
     showMainMenu()
     user_choose = input()
     if (user_choose == "1"):
-        schedulePlanting()
+        scheduleFarming()
     elif (user_choose == "2"):
         manualPlanting()
     elif (user_choose == "3"):

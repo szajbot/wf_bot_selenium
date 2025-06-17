@@ -1,22 +1,28 @@
 {
-  "farm": {
-    "counter": 2,
-    "one": {
-      "position": "farm1_pos1",
-      "watering_bonus": 10
+    "farm": {
+        "counter": 2,
+        "one": {
+            "position": "farm1_pos1",
+            "watering_bonus": 10
+        },
+        "two": {
+            "position": "farm1_pos3",
+            "watering_bonus": 10
+        }
     },
-    "two": {
-      "position": "farm1_pos3",
-      "watering_bonus": 10
+    "chicken": {
+        "counter": 1,
+        "one": {
+            "position": "farm1_pos2"
+        }
+    },
+    "cow": {
+        "counter": 0
+    },
+    "scheduling": {
+        "chickenFarming": "True",
+        "chickenFullFeed": "True",
+        "cowFarming": "True",
+        "cowFullFeed": "True"
     }
-  },
-  "chicken": {
-    "counter": 1,
-    "one": {
-      "position": "farm1_pos2"
-    }
-  },
-  "cow": {
-    "counter": 0
-  }
 }

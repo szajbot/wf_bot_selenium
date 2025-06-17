@@ -18,5 +18,11 @@
     },
     "cow": {
         "counter": 0
+    },
+    "scheduling": {
+        "chickenFarming": "True",
+        "chickenFullFeed": "True",
+        "cowFarming": "True",
+        "cowFullFeed": "True"
     }
 }
