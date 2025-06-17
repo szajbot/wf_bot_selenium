@@ -109,7 +109,7 @@ def showAvailablePositions():
 def addJobToQueue():
     showAvailablePositions()
     user_choose = input()
-    position = config["farm"][intToStrNumber(int(user_choose))]
+    position = config["farm"][intToStrNumber(int(user_choose))]["position"]
     plant: Plantable = setUpVegetables()
 
     exists = False
@@ -169,12 +169,6 @@ def scheduleFarming():
             exit(1)
         else:
             print("Zły wybór")
-
-
-def testJob():
-    print("test")
-    global executed_plant_job
-    executed_plant_job = True
 
 
 def executeSchedulePlant(plant: Plantable, position):
@@ -298,8 +292,8 @@ def water(vegetable: Plantable, window):
     time.sleep(0.2)
 
 
-def planting(farmPosition, vegetable: Plantable, watering, driver):
-    findAndClick(driver, farmPosition)
+def planting(farm_position, vegetable: Plantable, watering, driver):
+    findAndClick(driver, farm_position)
     harvest(driver)
     plant(vegetable, driver)
     if watering:
