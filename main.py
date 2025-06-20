@@ -9,6 +9,9 @@ import pyautogui
 import json
 import time
 
+import logging
+from settings.log_config import setup_logging
+
 from settings.login_config import (
     PASSWORD,
     LOGIN,
@@ -97,7 +100,7 @@ def showCurrentQueue():
     for queue in jobsQueue:
         print(f'Queue: {queue.position}')
         for job in queue.jobsList:
-            print(f'Job: {job.plant.name}')
+            print(f'Job: {job.plant.name} endless: {job.endless}')
         print("\n")
 
 
@@ -158,7 +161,9 @@ def executeQueue():
             job: ScheduledJob = queue.jobsList[0]
         else:
             job: ScheduledJob = queue.jobsList.pop(0)
+        logging.info(f"Executing job with plant {job.plant}")
         job.function(job.plant, queue.position)
+        logging.info("Job executed")
         queue.lastTaskTime = datetime.now()
 
     while True:
@@ -169,7 +174,9 @@ def executeQueue():
                     job: ScheduledJob = queue.jobsList[0]
                 else:
                     job: ScheduledJob = queue.jobsList.pop(0)
+                logging.info(f"Executing job with plant {job.plant}")
                 job.function(job.plant, queue.position)
+                logging.info("Job executed")
                 queue.lastTaskTime = datetime.now()
 
         time.sleep(5)
@@ -180,7 +187,7 @@ def executeQueue():
             else:
                 timePassed = datetime.now() - queue.lastTaskTime
                 timeLeft = (queue.jobsList[0].plant.plantTime * 60 * 0.97) - timePassed.seconds
-                print(f"Queue: {queue.position} time for next task: {timeLeft} next task: {queue.jobsList[0].plant} queue: {len(queue.jobsList)}")
+                print(f"Queue: {queue.position} time for next task: {timeLeft} next task: {queue.jobsList[0].plant.name} endless: {queue.jobsList[0].endless} queue: {len(queue.jobsList)}")
 
 
 def scheduleFarming():
