@@ -89,6 +89,7 @@ def showScheduleMenu():
     print("3. Execute queue")
     print("4. Show queue")
     print("5. Exit")
+    print("6. Add endless job")
 
 
 def showCurrentQueue():
@@ -104,7 +105,25 @@ def showAvailablePositions():
     for x in range(int(config["farm"]["counter"])):
         print(f'Option {x + 1}: position: {config["farm"][intToStrNumber(x + 1)]}')
 
+def addEndlessJobToQueue():
+    showAvailablePositions()
+    user_choose = input()
+    position = config["farm"][intToStrNumber(int(user_choose))]["position"]
+    plant: Plantable = setUpVegetables()
 
+    exists = False
+
+    for queue in jobsQueue:
+        if queue.position == position:
+            queue.jobsList.append(ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=True))
+            exists = True
+
+    if not exists:
+        job = ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=True)
+        jobList = list()
+        jobList.append(job)
+        queue = ScheduledJobQueue(jobList, position)
+        jobsQueue.append(queue)
 
 def addJobToQueue():
     showAvailablePositions()
@@ -135,22 +154,33 @@ def removeJobsFromQueue():
 def executeQueue():
     # immediately perform tasks from first position in queue
     for queue in jobsQueue:
-        job: ScheduledJob = queue.jobsList.pop(0)
+        if queue.jobsList[0].endless:
+            job: ScheduledJob = queue.jobsList[0]
+        else:
+            job: ScheduledJob = queue.jobsList.pop(0)
         job.function(job.plant, queue.position)
+        queue.lastTaskTime = datetime.now()
 
     while True:
         for queue in jobsQueue:
-            timePassed = queue.lastTaskTime - datetime.now()
-            if timePassed.seconds >= queue.jobsList[0].plant.plantTime * 60:
-                job: ScheduledJob = queue.jobsList.pop(0)
+            timePassed = datetime.now() - queue.lastTaskTime
+            if timePassed.seconds >= (queue.jobsList[0].plant.plantTime * 60 * 0.95):
+                if queue.jobsList[0].endless:
+                    job: ScheduledJob = queue.jobsList[0]
+                else:
+                    job: ScheduledJob = queue.jobsList.pop(0)
                 job.function(job.plant, queue.position)
+                queue.lastTaskTime = datetime.now()
 
         time.sleep(5)
         print("----------------Queue statuses----------------")
         for queue in jobsQueue:
-            timePassed = queue.lastTaskTime - datetime.now()
-            timeLeft = queue.jobsList[0].plant.plantTime * 60 - timePassed.seconds
-            print(f"Queue: {queue.position} time for next task: {timeLeft} queue: {queue.jobsList}")
+            if len(queue.jobsList) < 1:
+                jobsQueue.remove(queue)
+            else:
+                timePassed = datetime.now() - queue.lastTaskTime
+                timeLeft = (queue.jobsList[0].plant.plantTime * 60 * 0.97) - timePassed.seconds
+                print(f"Queue: {queue.position} time for next task: {timeLeft} next task: {queue.jobsList[0].plant} queue: {len(queue.jobsList)}")
 
 
 def scheduleFarming():
@@ -167,6 +197,8 @@ def scheduleFarming():
             showCurrentQueue()
         elif (user_choose == "5"):
             exit(1)
+        elif (user_choose == "6"):
+            addEndlessJobToQueue()
         else:
             print("Zły wybór")
 
