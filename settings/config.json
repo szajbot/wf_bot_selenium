@@ -17,7 +17,10 @@
         }
     },
     "cow": {
-        "counter": 0
+        "counter": 1,
+        "one": {
+            "position": "farm1_pos4"
+        }
     },
     "scheduling": {
         "chickenFarming": "True",
