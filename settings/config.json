@@ -3,11 +3,11 @@
         "counter": 2,
         "one": {
             "position": "farm1_pos1",
-            "watering_bonus": 10
+            "watering_bonus": 5
         },
         "two": {
             "position": "farm1_pos3",
-            "watering_bonus": 10
+            "watering_bonus": 5
         }
     },
     "chicken": {

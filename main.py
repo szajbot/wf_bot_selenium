@@ -1,17 +1,18 @@
 import datetime
 import logging
-from typing import Optional
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 
 from datetime import datetime, timedelta
 from selenium import webdriver
-import pyautogui
 import json
 import time
-from enum import Enum
 
+from structure.JobType import JobType
+from structure.Juice import Juice
+from structure.Plantable import Plantable
+from structure.predefined_lists import juices, farmPlants, chickenPlants, cowPlants, field
 from settings.logging_config import LoggingConfig
 
 LoggingConfig(logging)
@@ -22,30 +23,23 @@ from settings.login import (
     SERVER
 )
 
-
-class JobType(Enum):
-    Farming = 1
-    Cow = 2
-    Chicken = 3
-    Juices = 4
-
-
-class Plantable:
-    def __init__(self, name, id, size, plantTime):
-        self.name = name
-        self.id = id
-        self.size = size
-        self.plantTime = plantTime
-
-class Juice:
-    def __init__(self, name, id, jobTime):
-        self.name = name
-        self.id = id
-        self.jobTime = jobTime
+from settings.params import (
+    HARVEST_ALL_BUTTON,
+    WATER_ONE_BUTTON,
+    EXIT_FROM_FARM_BUTTON,
+    COLLECT_BUTTON,
+    ANIMAL_FEED_1,
+    ANIMAL_FEED_2,
+    ANIMAL_FEED_3,
+    ANIMAL_FEED_4,
+    CONFIG_FILE_NAME,
+    CLOSE_NEWSBOX
+)
 
 
 class ScheduledJob:
-    def __init__(self, executed: bool, function, endless: bool, type: JobType, plant: Plantable = None, juice: Juice = None):
+    def __init__(self, executed: bool, function, endless: bool, type: JobType, plant: Plantable = None,
+                 juice: Juice = None):
         self.executed = executed
         self.endless = endless
         self.function = function
@@ -54,62 +48,40 @@ class ScheduledJob:
         self.type = type
 
 
-class ScheduledJobQueue:
-    def __init__(self, jobsList: list[ScheduledJob], position):
-        self.jobsList = jobsList
+class FarmConfig:
+    def __init__(self, number, position, wateringBonus):
+        self.number = number
         self.position = position
-        self.lastTaskTime = datetime.now()
+        self.wateringBonus = wateringBonus
+
+
+class CowConfig:
+    def __init__(self, number, position):
+        self.number = number
+        self.position = position
+
+
+class ChickenConfig:
+    def __init__(self, number, position):
+        self.number = number
+        self.position = position
+
+
+class ScheduledJobQueue:
+    def __init__(self, jobsList: list[ScheduledJob], position, config):
+        self.jobsList = jobsList
+        self.config = config
+        self.position = position
+        self.lastTaskEndTime = datetime.now()
 
 
 # INICJALIZACJA
 window = webdriver
 user_choose = []
 user_input = ""
-juices = []
-farmPlants = []
-chickenPlants = []
-cowPlants = []
-pole = []
 jobsQueue: list[ScheduledJobQueue] = []
-executed_plant_job: bool = False
-harvestAllButton = "cropall"
-waterOneButton = "giessen"
-exitFromFarmButton = "gardencancel"
-animalCollect = "globalbox_button1"
-animalFeed1 = "feed_item1_normal"
-animalFeed2 = "feed_item2_normal"
-animalFeed3 = "feed_item3_normal"
-animalFeed4 = "feed_item4_normal"
-config_file_name = 'settings/config.json'
-with open(config_file_name, 'r') as file:
+with open(CONFIG_FILE_NAME, 'r') as file:
     config = json.loads(file.read())
-
-juices.append(Juice("Sok marchwiowy", "foodworld_selection_item130", 180))
-juices.append(Juice("Sok pomidorowy", "foodworld_selection_item131", 180))
-juices.append(Juice("Mleko truskawkowe", "foodworld_selection_item132", 90))
-juices.append(Juice("Mleko rzodkiewkowe", "foodworld_selection_item134", 90))
-
-# name, id, size, plant time
-farmPlants.append(Plantable("Marchewki", "rackitem17", 1, 15))
-farmPlants.append(Plantable("Truskawki", "rackitem20", 1, 480))
-farmPlants.append(Plantable("Zboze", "rackitem1", 2, 20))
-farmPlants.append(Plantable("Kukurydza", "rackitem2", 4, 45))
-farmPlants.append(Plantable("Ogorki", "rackitem18", 1, 90))
-farmPlants.append(Plantable("Cebule", "rackitem22", 1, 500))
-farmPlants.append(Plantable("Koniczyna", "rackitem3", 2, 45))
-farmPlants.append(Plantable("Pomidory", "rackitem21", 1, 600))
-farmPlants.append(Plantable("Rzodkiewki", "rackitem19", 1, 240))
-farmPlants.append(Plantable("Szpinak", "rackitem23", 1, 800))
-farmPlants.append(Plantable("Kalafiory", "rackitem24", 1, 720))
-farmPlants.append(Plantable("Rzepak", "rackitem4", 4, 90))
-farmPlants.append(Plantable("Buraki pastewne", "rackitem5", 4, 120))
-
-
-chickenPlants.append(Plantable("Zboze", "rackitem1", 2, 20))
-chickenPlants.append(Plantable("Kukurydza", "rackitem2", 4, 45))
-
-cowPlants.append(Plantable("Koniczyna", "rackitem3", 2, 45))
-cowPlants.append(Plantable("Rzepak", "rackitem4", 4, 90))
 
 
 def showMainMenu():
@@ -132,6 +104,7 @@ def showScheduleMenu():
 
 def showAvailableJobs():
     print("----------------Schedule Job----------------")
+    print("0. Go back")
     print("1. Planting")
     print("2. Chicken")
     print("3. Cow")
@@ -144,7 +117,7 @@ def showCurrentQueue():
     for queue in jobsQueue:
         print(f'Queue: {queue.position}')
         for job in queue.jobsList:
-            print(f'Job: {job.plant.name} endless: {job.endless}')
+            print(f'Job: {job.type}, {job.plant.name} endless: {job.endless}')
         print("\n")
 
 
@@ -162,12 +135,20 @@ def showAvailableCow():
     for x in range(int(config["cow"]["counter"])):
         print(f'Option {x + 1}: position: {config["cow"][intToStrNumber(x + 1)]}')
 
+def setUpPlantForFarming():
+    print("What would you like to plant?")
+    print("Opcja nr 0, go back")
+    for i in range(len(farmPlants)):
+        print(
+            f'Opcja nr {i + 1}, {farmPlants[i].name}: rozmiar: {farmPlants[i].size} czas do zbioru: {farmPlants[i].plantTime}')
 
 def addEndlessJobToQueue():
     showAvailableFarms()
     user_choose = input()
     position = config["farm"][intToStrNumber(int(user_choose))]["position"]
-    plant: Plantable = setUpPlantForFarming()
+    setUpPlantForFarming()
+    user_input = int(input())
+    plant = farmPlants[user_input - 1]
 
     exists = False
 
@@ -182,36 +163,52 @@ def addEndlessJobToQueue():
                            type=JobType.Farming)
         jobList = list()
         jobList.append(job)
-        queue = ScheduledJobQueue(jobList, position)
+        farmConfig = FarmConfig([intToStrNumber(int(user_choose))], position,
+                                config["farm"][intToStrNumber(int(user_choose))]["watering_bonus"])
+        queue = ScheduledJobQueue(jobList, position, farmConfig)
         jobsQueue.append(queue)
 
 
-def schedulePlanting():
+def addPlantingJobToPosition(position):
+    while True:
+        setUpPlantForFarming()
+        user_input = int(input())
+        if user_input == 0:
+            break
+        else:
+            plant = farmPlants[user_input - 1]
+            exists = False
+
+            for queue in jobsQueue:
+                if queue.position == position:
+                    queue.jobsList.append(
+                        ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False,
+                                     type=JobType.Farming))
+                    exists = True
+
+            if not exists:
+                job = ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False,
+                                   type=JobType.Farming)
+                jobList = list()
+                jobList.append(job)
+                farmConfig = FarmConfig([intToStrNumber(int(user_choose))], position,
+                                        config["farm"][intToStrNumber(int(user_choose))]["watering_bonus"])
+                queue = ScheduledJobQueue(jobList, position, farmConfig)
+                print("Time in minutes for finish planting")
+                user_input = int(input())
+                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=user_input))
+                jobsQueue.append(queue)
+
+
+def addPlantingJob():
     showAvailableFarms()
     user_choose = input()
     position = config["farm"][intToStrNumber(int(user_choose))]["position"]
-    plant: Plantable = setUpPlantForFarming()
-
-    exists = False
-
-    for queue in jobsQueue:
-        if queue.position == position:
-            queue.jobsList.append(
-                ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False,
-                             type=JobType.Farming))
-            exists = True
-
-    if not exists:
-        job = ScheduledJob(executed=False, function=executeSchedulePlant, plant=plant, endless=False,
-                           type=JobType.Farming)
-        jobList = list()
-        jobList.append(job)
-        queue = ScheduledJobQueue(jobList, position)
-        jobsQueue.append(queue)
+    addPlantingJobToPosition(position)
 
 
 def setUpPlantForChciken():
-    print("What would you like to plant?")
+    print("Feed chickens with what?")
     i = 0
 
     for i in range(len(chickenPlants)):
@@ -222,7 +219,7 @@ def setUpPlantForChciken():
 
 
 def setUpPlantForCow():
-    print("What would you like to plant?")
+    print("Feed cows with what?")
     i = 0
 
     for i in range(len(cowPlants)):
@@ -252,10 +249,11 @@ def scheduleChicken():
                            type=JobType.Chicken)
         jobList = list()
         jobList.append(job)
-        queue = ScheduledJobQueue(jobList, position)
-        print("Time in minutes for finish chicken (0 if null)")
+        chickenConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
+        queue = ScheduledJobQueue(jobList, position, chickenConfig)
+        print("Time in minutes for finish chicken")
         user_input = int(input())
-        queue.lastTaskTime = datetime.now() - (timedelta(hours=2) - timedelta(minutes=user_input))
+        queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
@@ -279,58 +277,22 @@ def scheduleCow():
                            type=JobType.Cow)
         jobList = list()
         jobList.append(job)
-        queue = ScheduledJobQueue(jobList, position)
-        print("Time in minutes for finish cow (0 if null)")
+        cowConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
+        queue = ScheduledJobQueue(jobList, position, cowConfig)
+        print("Time in minutes for finish cow")
         user_input = int(input())
-        queue.lastTaskTime = datetime.now() - (timedelta(hours=6) - timedelta(minutes=user_input))
+        queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
 def showAvailableJuice():
+    # TODO
     pass
 
 
 def scheduleJuices():
+    # TODO
     pass
-    # showAvailableJuice()
-    # user_choose = input()
-    # position = 'JuiceStand'
-    # juice: Juice = setUpJuice()
-    #
-    # exists = False
-    #
-    # for queue in jobsQueue:
-    #     if queue.position == position:
-    #         queue.jobsList.append(
-    #             ScheduledJob(executed=False, function=executeScheduleCow, plant=plant, endless=False,
-    #                          type=JobType.Cow))
-    #         exists = True
-    #
-    # if not exists:
-    #     job = ScheduledJob(executed=False, function=executeScheduleCow, plant=plant, endless=False,
-    #                        type=JobType.Cow)
-    #     jobList = list()
-    #     jobList.append(job)
-    #     queue = ScheduledJobQueue(jobList, position)
-    #     print("Time in minutes for finish juiceStand work (0 if null)")
-    #     user_input = int(input())
-    #     queue.lastTaskTime = datetime.now() - (timedelta(hours=6) - timedelta(minutes=user_input))
-    #     jobsQueue.append(queue)
-
-
-def addJobToQueue():
-    showAvailableJobs()
-    user_choose = input()
-    if (user_choose == "1"):
-        schedulePlanting()
-    elif (user_choose == "2"):
-        scheduleChicken()
-    elif (user_choose == "3"):
-        scheduleCow()
-    elif (user_choose == "4"):
-        scheduleJuices()
-    else:
-        print("Zły wybór")
 
 
 def removeJobsFromQueue():
@@ -339,22 +301,9 @@ def removeJobsFromQueue():
 
 
 def executeQueue():
-    # immediately perform tasks from first position in queue
-    for queue in jobsQueue:
-        if queue.jobsList[0].type == JobType.Farming:
-            if queue.jobsList[0].endless:
-                job: ScheduledJob = queue.jobsList[0]
-            else:
-                job: ScheduledJob = queue.jobsList.pop(0)
-            logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
-            job.function(job.plant, queue.position)
-            logging.info("Job executed")
-            queue.lastTaskTime = datetime.now()
-
     while True:
         for queue in jobsQueue:
-            timePassed = datetime.now() - queue.lastTaskTime
-            if queue.jobsList[0].type == JobType.Farming and timePassed.seconds >= (queue.jobsList[0].plant.plantTime * 60 * 0.95):
+            if queue.jobsList[0].type == JobType.Farming and queue.lastTaskEndTime <= datetime.now():
                 if queue.jobsList[0].endless:
                     job: ScheduledJob = queue.jobsList[0]
                 else:
@@ -362,8 +311,9 @@ def executeQueue():
                 logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
-                queue.lastTaskTime = datetime.now()
-            elif queue.jobsList[0].type == JobType.Chicken and timePassed.seconds >= (2 * 60 * 60):
+                queue.lastTaskEndTime = datetime.now() + (
+                    timedelta(minutes=job.plant.plantTime * 60 * (100 - queue.config.wateringBonus)))
+            elif queue.jobsList[0].type == JobType.Chicken and queue.lastTaskEndTime <= datetime.now():
                 if queue.jobsList[0].endless:
                     job: ScheduledJob = queue.jobsList[0]
                 else:
@@ -371,8 +321,8 @@ def executeQueue():
                 logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
-                queue.lastTaskTime = datetime.now()
-            elif queue.jobsList[0].type == JobType.Cow and timePassed.seconds >= (6 * 60 * 60):
+                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=2 * 60 * 60))
+            elif queue.jobsList[0].type == JobType.Cow and queue.lastTaskEndTime <= datetime.now():
                 if queue.jobsList[0].endless:
                     job: ScheduledJob = queue.jobsList[0]
                 else:
@@ -380,8 +330,7 @@ def executeQueue():
                 logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
-                queue.lastTaskTime = datetime.now()
-
+                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=6 * 60 * 60))
 
         time.sleep(5)
         print("----------------Queue statuses----------------")
@@ -389,59 +338,42 @@ def executeQueue():
             if len(queue.jobsList) < 1:
                 jobsQueue.remove(queue)
             else:
-                timePassed = datetime.now() - queue.lastTaskTime
+                timeLeft = queue.lastTaskEndTime - datetime.now()
                 if queue.jobsList[0].type == JobType.Farming:
-                    timeLeft = (queue.jobsList[0].plant.plantTime * 60 * 0.97) - timePassed.seconds
-                    print(f"Queue: {queue.position} time for next task: {timeLeft} next task: {queue.jobsList[0].plant.name} endless: {queue.jobsList[0].endless} queue: {len(queue.jobsList)}")
+                    print(
+                        f"Queue: {queue.position} time for next task: {timeLeft} next task: {queue.jobsList[0].plant.name} endless: {queue.jobsList[0].endless} queue: {len(queue.jobsList)}")
                 if queue.jobsList[0].type == JobType.Cow:
-                    timeLeft = (6 * 60 * 60) - timePassed.seconds
-                    print(f"Queue: {queue.position} time for {queue.jobsList[0].type.name}: {timeLeft} endless: {queue.jobsList[0].endless}")
+                    print(
+                        f"Queue: {queue.position} time for {queue.jobsList[0].type.name}: {timeLeft} endless: {queue.jobsList[0].endless}")
                 if queue.jobsList[0].type == JobType.Chicken:
-                    timeLeft = (2 * 60 * 60) - timePassed.seconds
-                    print(f"Queue: {queue.position} time for {queue.jobsList[0].type.name}: {timeLeft} endless: {queue.jobsList[0].endless}")
-
-
-
-def scheduleFarming():
-    while True:
-        showScheduleMenu()
-        user_choose = input()
-        if (user_choose == "1"):
-            addJobToQueue()
-        elif (user_choose == "2"):
-            removeJobsFromQueue()
-        elif (user_choose == "3"):
-            executeQueue()
-        elif (user_choose == "4"):
-            showCurrentQueue()
-        elif (user_choose == "5"):
-            exit(1)
-        elif (user_choose == "6"):
-            addEndlessJobToQueue()
-        else:
-            print("Zły wybór")
-
+                    print(
+                        f"Queue: {queue.position} time for {queue.jobsList[0].type.name}: {timeLeft} endless: {queue.jobsList[0].endless}")
 
 def executeSchedulePlant(plant: Plantable, position):
     driver, checkIsCorrect = login()
-    driver.fullscreen_window()  # TODO Temp solution
-    planting(position, plant, 'true', driver)
+    try:
+        driver.fullscreen_window()  # TODO Temp solution
+        planting(position, plant, 'true', driver)
+    except:
+        logging.info("Exception occurred trying planting once again")
+        driver.fullscreen_window()  # TODO Temp solution
+        planting(position, plant, 'true', driver)
     driver.close()
 
 
 def collectingEggs(position, plant, driver):
     findAndClick(driver, position)
     time.sleep(3)
-    findAndClick(driver, animalCollect)
+    findAndClick(driver, COLLECT_BUTTON)
     time.sleep(2)
 
     if plant.id == "rackitem1":
         for x in range(1, 120):
-            findAndClick(driver, animalFeed1)
+            findAndClick(driver, ANIMAL_FEED_1)
             time.sleep(0.5)
     if plant.id == "rackitem2":
         for x in range(1, 60):
-            findAndClick(driver, animalFeed2)
+            findAndClick(driver, ANIMAL_FEED_2)
             time.sleep(0.5)
 
     time.sleep(2)
@@ -451,16 +383,16 @@ def collectingEggs(position, plant, driver):
 def collectingMilk(position, plant, driver):
     findAndClick(driver, position)
     time.sleep(3)
-    findAndClick(driver, animalCollect)
+    findAndClick(driver, COLLECT_BUTTON)
     time.sleep(2)
 
     if plant.id == "rackitem3":
         for x in range(1, 48):
-            findAndClick(driver, animalFeed3)
+            findAndClick(driver, ANIMAL_FEED_3)
             time.sleep(0.7)
     if plant.id == "rackitem4":
         for x in range(1, 48):
-            findAndClick(driver, animalFeed4)
+            findAndClick(driver, ANIMAL_FEED_4)
             time.sleep(0.7)
 
     time.sleep(2)
@@ -481,6 +413,10 @@ def executeScheduleCow(plant: Plantable, position):
     driver.close()
 
 
+def closeNewsBox(driver):
+    element = driver.find_element(by=By.ID, value=CLOSE_NEWSBOX)
+    element.click()
+
 def findAndClick(driver, id):
     try:
         element = driver.find_element(by=By.ID, value=id)
@@ -494,7 +430,7 @@ def findAndWrite(driver, id, write):
         element = driver.find_element(by=By.ID, value=id)
         element.click()
         time.sleep(0.5)
-        pyautogui.write(str(write))
+        element.send_keys(str(write))
         time.sleep(0.5)
     except:
         print("Cannot find element: {id}" + id)
@@ -511,9 +447,9 @@ def findAndClickAndCheck(driver, id):
 
 def harvest(window):
     time.sleep(1)
-    findAndClick(window, harvestAllButton)
+    findAndClick(window, HARVEST_ALL_BUTTON)
     time.sleep(1)
-    findAndClick(window, "globalbox_button1")
+    findAndClick(window, COLLECT_BUTTON)
     time.sleep(1)
 
 
@@ -544,7 +480,7 @@ def login():
         findAndClick(driver, "loginbutton")
         time.sleep(3)
         for i in range(5):
-            findAndClick(driver, "newsbox_close")
+            closeNewsBox(driver)
         tryToCloseThatButton(driver)
         checkIsCorrect = findAndClickAndCheck(driver, "rackcat1_img")
         time.sleep(1)
@@ -559,7 +495,7 @@ def plant(vegetable: Plantable, window):
     findAndClick(window, "rackcat1_img")
     time.sleep(0.2)
     number = 1
-    for x in pole:
+    for x in field:
         if (vegetable.size == 1):
             findAndClick(window, x)
         if (vegetable.size == 2 and number % 2 == 1):
@@ -572,11 +508,11 @@ def plant(vegetable: Plantable, window):
 
 
 def water(vegetable: Plantable, window):
-    findAndClick(window, waterOneButton)
+    findAndClick(window, WATER_ONE_BUTTON)
     time.sleep(0.2)
     field_number = 1
     watered_fields = 0
-    for x in pole:
+    for x in field:
         if (vegetable.size == 1):
             findAndClick(window, x)
             watered_fields = watered_fields + 1
@@ -587,7 +523,7 @@ def water(vegetable: Plantable, window):
             findAndClick(window, x)
             watered_fields = watered_fields + 1
         if (watered_fields > 5):
-            findAndClick(window, waterOneButton)
+            findAndClick(window, WATER_ONE_BUTTON)
             watered_fields = 0
         time.sleep(0.1)
         field_number = field_number + 1
@@ -600,19 +536,9 @@ def planting(farm_position, vegetable: Plantable, watering, driver):
     plant(vegetable, driver)
     if watering:
         water(vegetable, driver)
-    findAndClick(driver, exitFromFarmButton)
+    findAndClick(driver, EXIT_FROM_FARM_BUTTON)
     time.sleep(1)
     pass
-
-
-def setUpPlantForFarming() -> Plantable:
-    print("What would you like to plant?")
-    i = 0
-    for i in range(len(farmPlants)):
-        print(
-            f'Opcja nr {i + 1}, {farmPlants[i].name}: rozmiar: {farmPlants[i].size} czas do zbioru: {farmPlants[i].plantTime}')
-    user_input = int(input()) - 1
-    return farmPlants[user_input]
 
 
 def execute(plant):
@@ -623,7 +549,9 @@ def execute(plant):
 
 
 def manualPlanting():
-    plant: Plantable = setUpPlantForFarming()
+    setUpPlantForFarming()
+    user_input = int(input())
+    plant = farmPlants[user_input - 1]
     execute(plant)
 
 
@@ -635,7 +563,6 @@ def intToStrNumber(user_choose):
         4: "four",
         5: "five",
     }
-
     return switcher.get(user_choose, "nothing")
 
 
@@ -673,12 +600,46 @@ def setUpConfiguration():
         config["cow"][intToStrNumber(x + 1)]["position"] = f'farm1_pos{user_choose}'
 
     file_to_write = json.dumps(config, indent=4)
-    with open(config_file_name, "w") as outfile:
+    with open(CONFIG_FILE_NAME, "w") as outfile:
         outfile.write(file_to_write)
 
 
-for x in range(1, 121):
-    pole.append("field" + str(x))
+def scheduleFarming():
+    while True:
+        showScheduleMenu()
+        user_choose = input()
+        if (user_choose == "1"):
+            addJobToQueue()
+        elif (user_choose == "2"):
+            removeJobsFromQueue()
+        elif (user_choose == "3"):
+            executeQueue()
+        elif (user_choose == "4"):
+            showCurrentQueue()
+        elif (user_choose == "5"):
+            exit(1)
+        elif (user_choose == "6"):
+            addEndlessJobToQueue()
+        else:
+            print("Zły wybór")
+
+
+def addJobToQueue():
+    while True:
+        showAvailableJobs()
+        user_choose = input()
+        if (user_choose == "1"):
+            addPlantingJob()
+        elif (user_choose == "2"):
+            scheduleChicken()
+        elif (user_choose == "3"):
+            scheduleCow()
+        elif (user_choose == "4"):
+            scheduleJuices()
+        elif (user_choose == "0"):
+            break
+        else:
+            print("Zły wybór")
 
 while True:
     logging.info("##################################")
