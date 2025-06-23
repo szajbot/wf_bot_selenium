@@ -102,6 +102,8 @@ farmPlants.append(Plantable("Rzodkiewki", "rackitem19", 1, 240))
 farmPlants.append(Plantable("Szpinak", "rackitem23", 1, 800))
 farmPlants.append(Plantable("Kalafiory", "rackitem24", 1, 720))
 farmPlants.append(Plantable("Rzepak", "rackitem4", 4, 90))
+farmPlants.append(Plantable("Buraki pastewne", "rackitem5", 4, 120))
+
 
 chickenPlants.append(Plantable("Zboze", "rackitem1", 2, 20))
 chickenPlants.append(Plantable("Kukurydza", "rackitem2", 4, 45))
@@ -434,11 +436,11 @@ def collectingEggs(position, plant, driver):
     time.sleep(2)
 
     if plant.id == "rackitem1":
-        for x in range(1, 60):
+        for x in range(1, 120):
             findAndClick(driver, animalFeed1)
             time.sleep(0.5)
     if plant.id == "rackitem2":
-        for x in range(1, 30):
+        for x in range(1, 60):
             findAndClick(driver, animalFeed2)
             time.sleep(0.5)
 
