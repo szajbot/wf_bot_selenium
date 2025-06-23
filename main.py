@@ -68,11 +68,12 @@ class ChickenConfig:
 
 
 class ScheduledJobQueue:
-    def __init__(self, jobsList: list[ScheduledJob], position, config):
+    def __init__(self, jobsList: list[ScheduledJob], position, config, type: JobType):
         self.jobsList = jobsList
         self.config = config
         self.position = position
         self.lastTaskEndTime = datetime.now()
+        self.type = type
 
 
 # INICJALIZACJA
@@ -165,7 +166,7 @@ def addEndlessJobToQueue():
         jobList.append(job)
         farmConfig = FarmConfig([intToStrNumber(int(user_choose))], position,
                                 config["farm"][intToStrNumber(int(user_choose))]["watering_bonus"])
-        queue = ScheduledJobQueue(jobList, position, farmConfig)
+        queue = ScheduledJobQueue(jobList, position, farmConfig, JobType.Farming)
         jobsQueue.append(queue)
 
 
@@ -193,10 +194,10 @@ def addPlantingJobToPosition(position):
                 jobList.append(job)
                 farmConfig = FarmConfig([intToStrNumber(int(user_choose))], position,
                                         config["farm"][intToStrNumber(int(user_choose))]["watering_bonus"])
-                queue = ScheduledJobQueue(jobList, position, farmConfig)
-                print("Time in minutes for finish planting")
-                user_input = int(input())
-                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=user_input))
+                queue = ScheduledJobQueue(jobList, position, farmConfig, JobType.Farming)
+                # print("Time in minutes for finish planting")
+                # user_input = int(input())
+                # queue.lastTaskEndTime = datetime.now()
                 jobsQueue.append(queue)
 
 
@@ -250,10 +251,10 @@ def scheduleChicken():
         jobList = list()
         jobList.append(job)
         chickenConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
-        queue = ScheduledJobQueue(jobList, position, chickenConfig)
-        print("Time in minutes for finish chicken")
-        user_input = int(input())
-        queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
+        queue = ScheduledJobQueue(jobList, position, chickenConfig, JobType.Chicken)
+        # print("Time in minutes for finish chicken")
+        # user_input = int(input())
+        # queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
@@ -278,10 +279,10 @@ def scheduleCow():
         jobList = list()
         jobList.append(job)
         cowConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
-        queue = ScheduledJobQueue(jobList, position, cowConfig)
-        print("Time in minutes for finish cow")
-        user_input = int(input())
-        queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
+        queue = ScheduledJobQueue(jobList, position, cowConfig, JobType.Cow)
+        # print("Time in minutes for finish cow")
+        # user_input = int(input())
+        # queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
@@ -300,7 +301,32 @@ def removeJobsFromQueue():
     jobsQueue = list()
 
 
+def configureStartingTime():
+    driver, checkIsCorrect = login()
+    driver.fullscreen_window()
+    for queue in jobsQueue:
+        if queue.type.Farming or queue.type.Cow or queue.type.Chicken:
+            position = queue.config.position.replace('farm', '').replace('pos', '')
+            try:
+                timer = driver.find_element(by=By.ID, value="farm_production_timer" + position).text
+            except:
+                timer = "Gotowe!"
+
+            if timer == "Gotowe!":
+                queue.lastTaskEndTime = datetime.now()
+            else:
+                hours = int(timer[0:2].lstrip("0"))
+                minutes = int(timer[3:5].lstrip("0"))
+                seconds = int(timer[6:8].lstrip("0"))
+                queue.lastTaskEndTime = datetime.now() + timedelta(hours=hours, minutes=minutes, seconds=seconds)
+        if queue.type.Juices:
+            pass
+
+    driver.close()
+
 def executeQueue():
+    configureStartingTime()
+
     while True:
         for queue in jobsQueue:
             if queue.jobsList[0].type == JobType.Farming and queue.lastTaskEndTime <= datetime.now():
