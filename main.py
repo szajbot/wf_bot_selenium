@@ -1,13 +1,13 @@
 import datetime
 import logging
+import os
+import json
+import time
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-
-from datetime import datetime, timedelta
 from selenium import webdriver
-import json
-import time
+from datetime import datetime, timedelta
 
 from structure.JobType import JobType
 from structure.Juice import Juice
@@ -85,6 +85,10 @@ with open(CONFIG_FILE_NAME, 'r') as file:
     config = json.loads(file.read())
 
 
+def cls():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
 def showMainMenu():
     print("----------------WF_farm_bot----------------")
     print("1. Schedule Farming")
@@ -136,12 +140,14 @@ def showAvailableCow():
     for x in range(int(config["cow"]["counter"])):
         print(f'Option {x + 1}: position: {config["cow"][intToStrNumber(x + 1)]}')
 
+
 def setUpPlantForFarming():
     print("What would you like to plant?")
     print("Opcja nr 0, go back")
     for i in range(len(farmPlants)):
         print(
             f'Opcja nr {i + 1}, {farmPlants[i].name}: rozmiar: {farmPlants[i].size} czas do zbioru: {farmPlants[i].plantTime}')
+
 
 def addEndlessJobToQueue():
     showAvailableFarms()
@@ -324,6 +330,7 @@ def configureStartingTime():
 
     driver.close()
 
+
 def executeQueue():
     configureStartingTime()
 
@@ -374,6 +381,7 @@ def executeQueue():
                 if queue.jobsList[0].type == JobType.Chicken:
                     print(
                         f"Queue: {queue.position} time for {queue.jobsList[0].type.name}: {timeLeft} endless: {queue.jobsList[0].endless}")
+
 
 def executeSchedulePlant(plant: Plantable, position):
     driver, checkIsCorrect = login()
@@ -442,6 +450,7 @@ def executeScheduleCow(plant: Plantable, position):
 def closeNewsBox(driver):
     element = driver.find_element(by=By.ID, value=CLOSE_NEWSBOX)
     element.click()
+
 
 def findAndClick(driver, id):
     try:
@@ -666,6 +675,7 @@ def addJobToQueue():
             break
         else:
             print("Zły wybór")
+
 
 while True:
     logging.info("##################################")
