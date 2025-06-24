@@ -90,6 +90,7 @@ def cls():
 
 
 def showMainMenu():
+    cls()
     print("----------------WF_farm_bot----------------")
     print("1. Schedule Farming")
     print("2. Manual Farming")
@@ -98,6 +99,7 @@ def showMainMenu():
 
 
 def showScheduleMenu():
+    cls()
     print("----------------Schedule Job----------------")
     print("1. Add job to queue")
     print("2. Remove job from queue")
@@ -108,6 +110,7 @@ def showScheduleMenu():
 
 
 def showAvailableJobs():
+    cls()
     print("----------------Schedule Job----------------")
     print("0. Go back")
     print("1. Planting")
@@ -118,6 +121,7 @@ def showAvailableJobs():
 
 
 def showCurrentQueue():
+    cls()
     print("----------------Queue statuses----------------")
     for queue in jobsQueue:
         print(f'Queue: {queue.position}')
@@ -127,21 +131,25 @@ def showCurrentQueue():
 
 
 def showAvailableFarms():
+    cls()
     for x in range(int(config["farm"]["counter"])):
         print(f'Option {x + 1}: position: {config["farm"][intToStrNumber(x + 1)]}')
 
 
 def showAvailableChciken():
+    cls()
     for x in range(int(config["chicken"]["counter"])):
         print(f'Option {x + 1}: position: {config["chicken"][intToStrNumber(x + 1)]}')
 
 
 def showAvailableCow():
+    cls()
     for x in range(int(config["cow"]["counter"])):
         print(f'Option {x + 1}: position: {config["cow"][intToStrNumber(x + 1)]}')
 
 
 def setUpPlantForFarming():
+    cls()
     print("What would you like to plant?")
     print("Opcja nr 0, go back")
     for i in range(len(farmPlants)):
