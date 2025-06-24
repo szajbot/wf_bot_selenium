@@ -201,9 +201,6 @@ def addPlantingJobToPosition(position):
                 farmConfig = FarmConfig([intToStrNumber(int(user_choose))], position,
                                         config["farm"][intToStrNumber(int(user_choose))]["watering_bonus"])
                 queue = ScheduledJobQueue(jobList, position, farmConfig, JobType.Farming)
-                # print("Time in minutes for finish planting")
-                # user_input = int(input())
-                # queue.lastTaskEndTime = datetime.now()
                 jobsQueue.append(queue)
 
 
@@ -258,9 +255,6 @@ def scheduleChicken():
         jobList.append(job)
         chickenConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
         queue = ScheduledJobQueue(jobList, position, chickenConfig, JobType.Chicken)
-        # print("Time in minutes for finish chicken")
-        # user_input = int(input())
-        # queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
@@ -286,9 +280,6 @@ def scheduleCow():
         jobList.append(job)
         cowConfig = ChickenConfig([intToStrNumber(int(user_choose))], position)
         queue = ScheduledJobQueue(jobList, position, cowConfig, JobType.Cow)
-        # print("Time in minutes for finish cow")
-        # user_input = int(input())
-        # queue.lastTaskEndTime = datetime.now() + timedelta(minutes=user_input)
         jobsQueue.append(queue)
 
 
@@ -321,9 +312,18 @@ def configureStartingTime():
             if timer == "Gotowe!":
                 queue.lastTaskEndTime = datetime.now()
             else:
-                hours = int(timer[0:2].lstrip("0"))
-                minutes = int(timer[3:5].lstrip("0"))
-                seconds = int(timer[6:8].lstrip("0"))
+                if timer[0:2] == '00':
+                    hours = 0
+                else:
+                    hours = int(timer[0:2].lstrip("0"))
+                if timer[3:5] == '00':
+                    minutes = 0
+                else:
+                    minutes = int(timer[3:5].lstrip("0"))
+                if timer[6:8] == '00':
+                    seconds = 0
+                else:
+                    seconds = int(timer[6:8].lstrip("0"))
                 queue.lastTaskEndTime = datetime.now() + timedelta(hours=hours, minutes=minutes, seconds=seconds)
         if queue.type.Juices:
             pass
@@ -345,7 +345,7 @@ def executeQueue():
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
                 queue.lastTaskEndTime = datetime.now() + (
-                    timedelta(minutes=job.plant.plantTime * 60 * (100 - queue.config.wateringBonus)))
+                    timedelta(seconds=(job.plant.plantTime * 60 * (100 - queue.config.wateringBonus)/ 100) + 5))
             elif queue.jobsList[0].type == JobType.Chicken and queue.lastTaskEndTime <= datetime.now():
                 if queue.jobsList[0].endless:
                     job: ScheduledJob = queue.jobsList[0]
@@ -354,7 +354,7 @@ def executeQueue():
                 logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
-                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=2 * 60 * 60))
+                queue.lastTaskEndTime = datetime.now() + (timedelta(seconds=2 * 60 * 60))
             elif queue.jobsList[0].type == JobType.Cow and queue.lastTaskEndTime <= datetime.now():
                 if queue.jobsList[0].endless:
                     job: ScheduledJob = queue.jobsList[0]
@@ -363,7 +363,7 @@ def executeQueue():
                 logging.info(f"Executing job: {job.type.name} with plant {job.plant.name}")
                 job.function(job.plant, queue.position)
                 logging.info("Job executed")
-                queue.lastTaskEndTime = datetime.now() + (timedelta(minutes=6 * 60 * 60))
+                queue.lastTaskEndTime = datetime.now() + (timedelta(seconds=6 * 60 * 60))
 
         time.sleep(5)
         print("----------------Queue statuses----------------")
